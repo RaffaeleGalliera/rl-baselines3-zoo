@@ -1,3 +1,7 @@
+import logging
+from gym.envs.registration import register
+
+from envs.env import CongestionControlEnv
 try:
     import pybullet_envs  # pytype: disable=import-error
 except ImportError:
@@ -32,3 +36,13 @@ try:
     import panda_gym  # pytype: disable=import-error
 except ImportError:
     panda_gym = None
+
+try:
+    register(
+        id='Marlin-v1',
+        entry_point='envs.env:CongestionControlEnv',
+        max_episode_steps=100,
+        kwargs={'total_timesteps': 50000}
+    )
+except ImportError:
+    logging.warning("Marlin import error")
