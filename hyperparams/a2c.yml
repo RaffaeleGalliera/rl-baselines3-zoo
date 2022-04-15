@@ -2,6 +2,8 @@ Marlin-v1:
   n_envs: 1
   n_timesteps: !!float 5e5
   policy: 'MlpPolicy'
+  callback:
+    - envs.utils.callbacks.TrainingCallback
   ent_coef: 0.0
 
 atari:
