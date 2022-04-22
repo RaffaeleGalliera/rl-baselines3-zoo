@@ -5,6 +5,7 @@ Marlin-v1:
   callback:
     - envs.utils.callbacks.TrainingCallback
   ent_coef: 0.0
+  normalize: true
 
 atari:
   env_wrapper:
