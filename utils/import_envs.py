@@ -39,7 +39,7 @@ except ImportError:
 try:
     register(
         id='Marlin-v1',
-        entry_point='envs.env:CongestionControlEnv',
+        entry_point='envs.rl_zoo_env:CongestionControlEnv',
     )
 except ImportError:
     logging.warning("Marlin import error")
