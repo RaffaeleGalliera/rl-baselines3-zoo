@@ -46,6 +46,8 @@ from utils.callbacks import SaveVecNormalizeCallback, TrialEvalCallback
 from utils.hyperparams_opt import HYPERPARAMS_SAMPLER
 from utils.utils import ALGOS, get_callback_list, get_latest_run_id, get_wrapper_class, linear_schedule
 
+from envs.utils.callbacks import EpisodeEvalCallback, EpisodeTrialEvalCallback
+
 
 class ExperimentManager(object):
     """
@@ -439,13 +441,13 @@ class ExperimentManager(object):
                 print("Creating test environment")
 
             save_vec_normalize = SaveVecNormalizeCallback(save_freq=1, save_path=self.params_path)
-            eval_callback = EvalCallback(
+            eval_callback = EpisodeEvalCallback(
                 self.create_envs(self.n_eval_envs, eval_env=True),
                 callback_on_new_best=save_vec_normalize,
                 best_model_save_path=self.save_path,
                 n_eval_episodes=self.n_eval_episodes,
                 log_path=self.save_path,
-                eval_freq=self.eval_freq,
+                eval_freq_ep=self.eval_freq,
                 deterministic=self.deterministic_eval,
             )
 
@@ -669,13 +671,13 @@ class ExperimentManager(object):
         if self.optimization_log_path is not None:
             path = os.path.join(self.optimization_log_path, f"trial_{str(trial.number)}")
         callbacks = get_callback_list({"callback": self.specified_callbacks})
-        eval_callback = TrialEvalCallback(
+        eval_callback = EpisodeTrialEvalCallback(
             eval_env,
             trial,
             best_model_save_path=path,
             log_path=path,
             n_eval_episodes=self.n_eval_episodes,
-            eval_freq=optuna_eval_freq,
+            eval_freq_ep=self.eval_freq,
             deterministic=self.deterministic_eval,
         )
         callbacks.append(eval_callback)
