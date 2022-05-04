@@ -1,9 +1,8 @@
 Marlin-v1:
   callback:
     - envs.utils.callbacks.TrainingCallback
-  n_timesteps: !!float 1e5
+  n_timesteps: !!float 5e5
   policy: 'MlpPolicy'
-  normalize: true
 #  learning_rate: !!float 6.3e-4
 #  batch_size: 128
 #  buffer_size: 50000
@@ -15,8 +14,6 @@ Marlin-v1:
 #  exploration_fraction: 0.12
 #  exploration_final_eps: 0.1
 #  policy_kwargs: "dict(net_arch=[256, 256])"
-#  normalize: True
-
 
 atari:
   env_wrapper:
