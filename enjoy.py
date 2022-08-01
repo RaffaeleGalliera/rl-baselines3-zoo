@@ -1,8 +1,11 @@
 import argparse
+import csv
 import glob
 import importlib
+import logging
 import os
 import sys
+import time
 
 import numpy as np
 import torch as th
@@ -10,6 +13,7 @@ import yaml
 from stable_baselines3.common.utils import set_random_seed
 
 import utils.import_envs  # noqa: F401 pylint: disable=unused-import
+from envs.utils.constants import Parameters
 from utils import ALGOS, create_test_env, get_latest_run_id, get_saved_hyperparams
 from utils.exp_manager import ExperimentManager
 from utils.utils import StoreDict
@@ -21,6 +25,8 @@ def main():  # noqa: C901
     parser.add_argument("-f", "--folder", help="Log folder", type=str, default="rl-trained-agents")
     parser.add_argument("--algo", help="RL Algorithm", default="ppo", type=str, required=False, choices=list(ALGOS.keys()))
     parser.add_argument("-n", "--n-timesteps", help="number of timesteps", default=1000, type=int)
+    parser.add_argument("-eps", "--n-episodes", help="number of timesteps",
+                        default=10, type=int)
     parser.add_argument("--num-threads", help="Number of threads for PyTorch (-1 to use default)", default=-1, type=int)
     parser.add_argument("--n-envs", help="number of environments", default=1, type=int)
     parser.add_argument("--exp-id", help="Experiment ID (default: 0: latest, -1: no exp folder)", default=0, type=int)
@@ -191,9 +197,113 @@ def main():  # noqa: C901
     # For HER, monitor success rate
     successes = []
     try:
-        for _ in range(args.n_timesteps):
+        throughput_sum = 0
+        goodput_sum = 0
+        rtt_sum = 0
+        retransmissions_sum = 0
+        cwnd_sum = 0
+        delay_sum = 0
+        step_logs = []
+        episodes_done = 0
+
+        while episodes_done < args.n_episodes:
             action, state = model.predict(obs, state=state, deterministic=deterministic)
             obs, reward, done, infos = env.step(action)
+
+            for info in infos:
+                if 'current_statistics' in info:
+                    throughput_sum += info['current_statistics'][
+                        Parameters.THROUGHPUT]
+                    goodput_sum += info['current_statistics'][
+                        Parameters.GOODPUT]
+                    rtt_sum += info['current_statistics'][
+                        Parameters.LAST_RTT]
+                    retransmissions_sum += info['current_statistics'][
+                        Parameters.RETRANSMISSIONS]
+                    cwnd_sum += info['current_statistics'][
+                        Parameters.CURR_WINDOW_SIZE]
+                    delay_sum += info['action_delay']
+
+                    step_logger = {
+                        "throughput_KB": info[
+                            'current_statistics'][Parameters.THROUGHPUT],
+                        "goodput_KB": info[
+                            'current_statistics'][Parameters.GOODPUT],
+                        "rtt_ms": info[
+                            'current_statistics'][Parameters.LAST_RTT],
+                        "retransmissions": info[
+                            'current_statistics'][Parameters.RETRANSMISSIONS],
+                        "ema_retransmissions": info[
+                            'current_statistics'][
+                            Parameters.EMA_RETRANSMISSIONS],
+                        "current_window_size_KB": info[
+                            'current_statistics'][Parameters.CURR_WINDOW_SIZE],
+                        'action': info['action'],
+                        'action_delay_ms': info['action_delay'],
+                        'rewards': info['reward'],
+                        'timestamp': time.time_ns()
+                    }
+                    step_logs.append(step_logger)
+
+                if 'episode' in info:
+                    episodes_done += 1
+                    avg_episodic_throughput = throughput_sum / info["episode"]["l"]
+                    avg_episodic_goodput = goodput_sum / info["episode"]["l"]
+                    avg_episodic_rtt = rtt_sum / info["episode"]["l"]
+                    avg_episodic_retransmissions = retransmissions_sum / info["episode"]["l"]
+                    avg_window_size = cwnd_sum / info["episode"]["l"]
+                    avg_delay = delay_sum / info["episode"]["l"]
+
+                    episode_logger = {
+                        "episodic_return": info["episode"]["r"],
+                        "episodic_length": info["episode"]["l"],
+                        "episodic_avg_throughput_KB":
+                            avg_episodic_throughput,
+                        "episodic_avg_goodput_KB":
+                            avg_episodic_goodput,
+                        "episodic_avg_rtt_ms": avg_episodic_rtt,
+                        "episodic_avg_retransmissions": avg_episodic_retransmissions,
+                        "total_retransmissions": retransmissions_sum,
+                        "episodic_window_size_KB":
+                            avg_window_size,
+                        "avg_delay_ms": avg_delay,
+                        "seconds_taken": time.time() - info['start_time']
+                    }
+
+                    print("Saving Steps Data to CSV")
+                    try:
+                        keys = step_logs[0].keys()
+
+                        with open('step_logging.csv', 'a',
+                                  newline='') as output_file:
+                            dict_writer = csv.DictWriter(output_file, keys)
+                            dict_writer.writeheader()
+                            dict_writer.writerows(step_logs)
+
+                    except IOError:
+                        print("I/O error")
+
+                    print("Saving AVG Data to CSV")
+                    try:
+                        keys = episode_logger.keys()
+
+                        with open('episode_logger.csv', 'a+',
+                                  newline='') as output_file:
+                            dict_writer = csv.DictWriter(output_file, keys)
+                            dict_writer.writeheader()
+                            dict_writer.writerow(episode_logger)
+
+                    except IOError:
+                        print("I/O error")
+
+                    throughput_sum = 0
+                    goodput_sum = 0
+                    rtt_sum = 0
+                    retransmissions_sum = 0
+                    cwnd_sum = 0
+                    delay_sum = 0
+                    step_logs = []
+
             if not args.no_render:
                 env.render("human")
 

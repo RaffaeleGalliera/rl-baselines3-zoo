@@ -2,7 +2,7 @@
 Marlin-v1:
   env_wrapper:
     - utils.wrappers.HistoryWrapper:
-        horizon: 10
+        horizon: 50
   callback:
     - envs.utils.callbacks.TrainingCallback
   n_timesteps: !!float 5e5
