@@ -527,11 +527,13 @@ class ExperimentManager:
 
         # On most env, SubprocVecEnv does not help and is quite memory hungry
         # therefore we use DummyVecEnv by default
+        env_kwargs_eval = self.env_kwargs
+        env_kwargs_eval['is_testing'] = eval_env
         env = make_vec_env(
             env_id=self.env_id,
             n_envs=n_envs,
             seed=self.seed,
-            env_kwargs=self.env_kwargs,
+            env_kwargs=env_kwargs_eval,
             monitor_dir=log_dir,
             wrapper_class=self.env_wrapper,
             vec_env_cls=self.vec_env_class,
