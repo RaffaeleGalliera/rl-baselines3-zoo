@@ -13,7 +13,7 @@ import yaml
 from stable_baselines3.common.utils import set_random_seed
 
 import utils.import_envs  # noqa: F401 pylint: disable=unused-import
-from envs.utils.constants import Parameters
+from envs.utils.constants import State
 from utils import ALGOS, create_test_env, get_latest_run_id, get_saved_hyperparams
 from utils.exp_manager import ExperimentManager
 from utils.utils import StoreDict
@@ -203,6 +203,7 @@ def main():  # noqa: C901
         retransmissions_sum = 0
         cwnd_sum = 0
         delay_sum = 0
+        packets_sum = 0
         step_logs = []
         episodes_done = 0
 
@@ -213,31 +214,29 @@ def main():  # noqa: C901
             for info in infos:
                 if 'current_statistics' in info:
                     throughput_sum += info['current_statistics'][
-                        Parameters.THROUGHPUT]
+                        State.THROUGHPUT]
                     goodput_sum += info['current_statistics'][
-                        Parameters.GOODPUT]
+                        State.GOODPUT]
                     rtt_sum += info['current_statistics'][
-                        Parameters.LAST_RTT]
+                        State.LAST_RTT]
                     retransmissions_sum += info['current_statistics'][
-                        Parameters.RETRANSMISSIONS]
+                        State.RETRANSMISSIONS]
                     cwnd_sum += info['current_statistics'][
-                        Parameters.CURR_WINDOW_SIZE]
+                        State.CURR_WINDOW_SIZE]
+                    packets_sum += info['current_statistics'][State.PACKETS_TRANSMITTED]
                     delay_sum += info['action_delay']
 
                     step_logger = {
                         "throughput_KB": info[
-                            'current_statistics'][Parameters.THROUGHPUT],
+                            'current_statistics'][State.THROUGHPUT],
                         "goodput_KB": info[
-                            'current_statistics'][Parameters.GOODPUT],
+                            'current_statistics'][State.GOODPUT],
                         "rtt_ms": info[
-                            'current_statistics'][Parameters.LAST_RTT],
+                            'current_statistics'][State.LAST_RTT],
                         "retransmissions": info[
-                            'current_statistics'][Parameters.RETRANSMISSIONS],
-                        "ema_retransmissions": info[
-                            'current_statistics'][
-                            Parameters.EMA_RETRANSMISSIONS],
+                            'current_statistics'][State.RETRANSMISSIONS],
                         "current_window_size_KB": info[
-                            'current_statistics'][Parameters.CURR_WINDOW_SIZE],
+                            'current_statistics'][State.CURR_WINDOW_SIZE],
                         'action': info['action'],
                         'action_delay_ms': info['action_delay'],
                         'rewards': info['reward'],
@@ -253,6 +252,7 @@ def main():  # noqa: C901
                     avg_episodic_retransmissions = retransmissions_sum / info["episode"]["l"]
                     avg_window_size = cwnd_sum / info["episode"]["l"]
                     avg_delay = delay_sum / info["episode"]["l"]
+                    avg_packets = packets_sum / info["episode"]["l"]
 
                     episode_logger = {
                         "episodic_return": info["episode"]["r"],
@@ -267,6 +267,7 @@ def main():  # noqa: C901
                         "episodic_window_size_KB":
                             avg_window_size,
                         "avg_delay_ms": avg_delay,
+                        "avg_packets" : avg_packets,
                         "seconds_taken": time.time() - info['start_time']
                     }
 
@@ -302,6 +303,7 @@ def main():  # noqa: C901
                     retransmissions_sum = 0
                     cwnd_sum = 0
                     delay_sum = 0
+                    packets_sum = 0
                     step_logs = []
 
             if not args.no_render:

@@ -2,7 +2,7 @@
 Marlin-v1:
   env_wrapper:
     - utils.wrappers.HistoryWrapper:
-        horizon: 50
+        horizon: 10
   callback:
     - envs.utils.callbacks.TrainingCallback
   n_timesteps: !!float 5e5
@@ -13,7 +13,7 @@ Marlin-v1:
 #  learning_rate: !!float 7.3e-4
 #  buffer_size: 300000
 #  batch_size: 256
-#  ent_coef: 'auto'
+  ent_coef: 'auto'
 #  gamma: 0.98
 #  tau: 0.02
 #  train_freq: 64
