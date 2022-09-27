@@ -45,7 +45,7 @@ from torch import nn as nn  # noqa: F401
 
 # Register custom envs
 import utils.import_envs  # noqa: F401 pytype: disable=import-error
-from utils.callbacks import SaveVecNormalizeCallback, TrialEvalCallback
+from utils.callbacks import SaveVecNormalizeCallback, TQDMCallback, TrialEvalCallback
 from utils.hyperparams_opt import HYPERPARAMS_SAMPLER
 from utils.utils import ALGOS, get_callback_list, get_latest_run_id, get_wrapper_class, linear_schedule
 
@@ -96,6 +96,7 @@ class ExperimentManager:
         no_optim_plots: bool = False,
         device: Union[th.device, str] = "auto",
         yaml_file: Optional[str] = None,
+        show_progress: bool = False,
     ):
         super().__init__()
         self.algo = algo
@@ -159,6 +160,7 @@ class ExperimentManager:
         self.args = args
         self.log_interval = log_interval
         self.save_replay_buffer = save_replay_buffer
+        self.show_progress = show_progress
 
         self.log_path = f"{log_folder}/{self.algo}/"
         self.save_path = os.path.join(
@@ -180,7 +182,7 @@ class ExperimentManager:
         self.create_callbacks()
 
         # Create env to have access to action space for action noise
-        n_envs = 1 if self.algo == "ars" else self.n_envs
+        n_envs = 1 if self.algo == "ars" or self.optimize_hyperparameters else self.n_envs
         env = self.create_envs(n_envs, no_log=False)
 
         self._hyperparams = self._preprocess_action_noise(hyperparams, saved_hyperparams, env)
@@ -188,6 +190,7 @@ class ExperimentManager:
         if self.continue_training:
             model = self._load_pretrained_agent(self._hyperparams, env)
         elif self.optimize_hyperparameters:
+            env.close()
             return None
         else:
             # Train an agent from scratch
@@ -433,6 +436,9 @@ class ExperimentManager:
         os.makedirs(self.params_path, exist_ok=True)
 
     def create_callbacks(self):
+
+        if self.show_progress:
+            self.callbacks.append(TQDMCallback())
 
         if self.save_freq > 0:
             # Account for the number of parallel environments
