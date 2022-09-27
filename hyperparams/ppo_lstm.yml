@@ -1,3 +1,37 @@
+Marlin-v1:
+  callback:
+    - envs.utils.callbacks.TrainingCallback
+  normalize: True
+  n_envs: 1
+  n_timesteps: !!float 5e5
+  policy: 'MlpLstmPolicy'
+  use_sde: True
+  policy_kwargs: "dict(
+                    ortho_init=False,
+                    activation_fn=nn.ReLU,
+                    lstm_hidden_size=64,
+                    enable_critic_lstm=True,
+                    net_arch=[dict(pi=[64], vf=[64])]
+                  )"
+
+Marlin-discrete-v1:
+  callback:
+    - envs.utils.callbacks.TrainingCallback
+  normalize: True
+  n_envs: 1
+  n_steps: 512
+  n_timesteps: !!float 1e6
+  policy: 'MlpLstmPolicy'
+  n_epochs: 10
+  policy_kwargs: "dict(
+                    ortho_init=False,
+                    activation_fn=nn.ReLU,
+                    lstm_hidden_size=64,
+                    enable_critic_lstm=True,
+                    net_arch=[dict(pi=[64], vf=[64])]
+                  )"
+
+
 atari:
   env_wrapper:
     - stable_baselines3.common.atari_wrappers.AtariWrapper:

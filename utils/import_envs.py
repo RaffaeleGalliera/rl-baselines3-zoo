@@ -68,3 +68,11 @@ try:
     )
 except ImportError:
     logging.warning("Marlin import error")
+
+try:
+    register(
+        id='Marlin-discrete-v1',
+        entry_point='envs.rl_zoo_env_discrete:CongestionControlEnv',
+    )
+except ImportError:
+    logging.warning("Marlin import error")
