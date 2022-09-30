@@ -1,6 +1,8 @@
 # Tuned
 Marlin-v1:
   env_wrapper:
+    - gym.wrappers.time_limit.TimeLimit:
+        max_episode_steps: 600
     - utils.wrappers.HistoryWrapper:
         horizon: 10
   callback:
