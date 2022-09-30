@@ -16,6 +16,11 @@ from utils.exp_manager import ExperimentManager
 from utils.load_from_hub import download_from_hub
 from utils.utils import StoreDict, get_model_path
 
+from envs.utils.constants import State
+import time
+import csv
+
+from pathlib import Path
 
 def main():  # noqa: C901
     parser = argparse.ArgumentParser()
@@ -27,6 +32,7 @@ def main():  # noqa: C901
     parser.add_argument("--n-envs", help="number of environments", default=1, type=int)
     parser.add_argument("--exp-id", help="Experiment ID (default: 0: latest, -1: no exp folder)", default=0, type=int)
     parser.add_argument("--verbose", help="Verbose mode (0: no output, 1: INFO)", default=1, type=int)
+    parser.add_argument("-eps", "--n-episodes", help="number of episodes", default=10, type=int)
     parser.add_argument(
         "--no-render", action="store_true", default=False, help="Do not render the environment (useful for tests)"
     )
@@ -208,8 +214,20 @@ def main():  # noqa: C901
     if args.progress:
         generator = tqdm(generator)
 
+    evaluation_folder = f"evaluation/{algo}/{args.exp_id}"
+    Path(evaluation_folder).mkdir(parents=True, exist_ok=True)
+
     try:
-        for _ in generator:
+        throughput_sum = 0
+        goodput_sum = 0
+        rtt_sum = 0
+        retransmissions_sum = 0
+        cwnd_sum = 0
+        delay_sum = 0
+        step_logs = []
+        episodes_done = 0
+
+        while episodes_done < args.n_episodes:
             action, lstm_states = model.predict(
                 obs,
                 state=lstm_states,
@@ -219,6 +237,38 @@ def main():  # noqa: C901
             obs, reward, done, infos = env.step(action)
 
             episode_start = done
+
+            for info in infos:
+                if 'current_statistics' in info:
+                    throughput_sum += info['current_statistics'][
+                        State.THROUGHPUT]
+                    goodput_sum += info['current_statistics'][
+                        State.GOODPUT]
+                    rtt_sum += info['current_statistics'][
+                        State.LAST_RTT]
+                    retransmissions_sum += info['current_statistics'][
+                        State.RETRANSMISSIONS]
+                    cwnd_sum += info['current_statistics'][
+                        State.CURR_WINDOW_SIZE]
+                    delay_sum += info['action_delay']
+
+                    step_logger = {
+                        "throughput_KB": info[
+                            'current_statistics'][State.THROUGHPUT],
+                        "goodput_KB": info[
+                            'current_statistics'][State.GOODPUT],
+                        "rtt_ms": info[
+                            'current_statistics'][State.LAST_RTT],
+                        "retransmissions": info[
+                            'current_statistics'][State.RETRANSMISSIONS],
+                        "current_window_size_KB": info[
+                            'current_statistics'][State.CURR_WINDOW_SIZE],
+                        'action': info['action'],
+                        'action_delay_ms': info['action_delay'],
+                        'rewards': info['reward'],
+                        'timestamp': time.time_ns()
+                    }
+                    step_logs.append(step_logger)
 
             if not args.no_render:
                 env.render("human")
@@ -236,6 +286,72 @@ def main():  # noqa: C901
                         print("Atari Episode Length", episode_infos["l"])
 
                 if done and not is_atari and args.verbose > 0:
+                    episodes_done += 1
+                    avg_episodic_throughput = throughput_sum / \
+                                              info["episode"]["l"]
+                    avg_episodic_goodput = goodput_sum / info["episode"][
+                        "l"]
+                    avg_episodic_rtt = rtt_sum / info["episode"]["l"]
+                    avg_episodic_retransmissions = retransmissions_sum / \
+                                                   info["episode"]["l"]
+                    avg_window_size = cwnd_sum / info["episode"]["l"]
+                    avg_delay = delay_sum / info["episode"]["l"]
+
+                    episode_logger = {
+                        "episodic_return": info["episode"]["r"],
+                        "episodic_length": info["episode"]["l"],
+                        "episodic_avg_throughput_KB":
+                            avg_episodic_throughput,
+                        "episodic_avg_goodput_KB":
+                            avg_episodic_goodput,
+                        "episodic_avg_rtt_ms": avg_episodic_rtt,
+                        "episodic_avg_retransmissions": avg_episodic_retransmissions,
+                        "total_retransmissions": retransmissions_sum,
+                        "episodic_window_size_KB":
+                            avg_window_size,
+                        "avg_delay_ms": avg_delay,
+                        "seconds_taken": time.time() - info['start_time']
+                    }
+
+                    print("Saving Steps Data to CSV")
+                    try:
+                        keys = step_logs[0].keys()
+                        filename = f"{evaluation_folder}/step_logging_ep{episodes_done}.csv"
+                        file_exists = os.path.isfile(filename)
+                        with open(filename, 'a',
+                                  newline='') as output_file:
+                            dict_writer = csv.DictWriter(output_file, keys)
+                            if not file_exists:
+                                dict_writer.writeheader()
+                            dict_writer.writerows(step_logs)
+
+                    except IOError:
+                        print("I/O error")
+
+                    print("Saving AVG Data to CSV")
+
+                    try:
+                        keys = episode_logger.keys()
+                        filename = f"{evaluation_folder}/episode_logger.csv"
+                        file_exists = os.path.isfile(filename)
+
+                        with open(filename, 'a+',newline='') as output_file:
+                            dict_writer = csv.DictWriter(output_file, keys)
+                            if file_exists:
+                                dict_writer.writeheader()
+                            dict_writer.writerow(episode_logger)
+
+                    except IOError:
+                        print("I/O error")
+
+                    throughput_sum = 0
+                    goodput_sum = 0
+                    rtt_sum = 0
+                    retransmissions_sum = 0
+                    cwnd_sum = 0
+                    delay_sum = 0
+                    step_logs = []
+
                     # NOTE: for env using VecNormalize, the mean reward
                     # is a normalized reward when `--norm_reward` flag is passed
                     print(f"Episode Reward: {episode_reward:.2f}")
