@@ -1,8 +1,6 @@
 # Tuned
 Marlin-v1:
   env_wrapper:
-    - gym.wrappers.time_limit.TimeLimit:
-        max_episode_steps: 600
     - utils.wrappers.HistoryWrapper:
         horizon: 10
   callback:
@@ -13,11 +11,13 @@ Marlin-v1:
   ent_coef: 'auto'
   buffer_size: 500000
   train_freq: [1, "episode"]
+  learning_rate: !!float 3e-4
   gradient_steps: -1
+  batch_size: 512
   # 10 episodes of warm-up
   learning_starts: 10000
   policy_kwargs: "dict(net_arch=[400, 300])"
-  
+
 #Marlin-v1:
 #  env_wrapper:
 #    - utils.wrappers.HistoryWrapper:
