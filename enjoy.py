@@ -327,7 +327,7 @@ def main():  # noqa: C901
                             with open(filename, 'a+',
                                       newline='') as output_file:
                                 dict_writer = csv.DictWriter(output_file, keys)
-                                if file_exists:
+                                if not file_exists:
                                     dict_writer.writeheader()
                                 dict_writer.writerow(episode_logger)
 
